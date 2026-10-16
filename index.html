@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ระบบบริหารจัดการสัญญาประกันศาล</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0d6efd">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ระบบประกันศาล">
+
+  <!-- Icons & Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Google Fonts: Sarabun -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Sarabun', sans-serif;
+      background-color: #0b1a30;
+      color: #333;
+    }
+
+    #app-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Iframe ที่ฝัง Google Apps Script Web App */
+    #gas-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+      background-color: #f4f7f6;
+    }
+
+    /* Splash / Loading Screen */
+    #splash-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 30%, #1e3c72 0%, #102040 60%, #081020 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      color: white;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #splash-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .app-logo-badge {
+      width: 96px;
+      height: 96px;
+      background: linear-gradient(135deg, #0d6efd, #00d2ff);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      color: white;
+      box-shadow: 0 10px 25px rgba(13, 110, 253, 0.45), 0 0 40px rgba(0, 210, 255, 0.25);
+      margin-bottom: 24px;
+      animation: pulse-glow 2.4s infinite ease-in-out;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 10px 25px rgba(13, 110, 253, 0.45), 0 0 30px rgba(0, 210, 255, 0.2);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 14px 32px rgba(13, 110, 253, 0.6), 0 0 50px rgba(0, 210, 255, 0.4);
+      }
+    }
+
+    .app-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .app-subtitle {
+      font-size: 0.95rem;
+      color: #94a3b8;
+      margin-bottom: 28px;
+    }
+
+    .loader-bar {
+      width: 200px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 99px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .loader-bar-inner {
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(90deg, #00d2ff, #0d6efd);
+      border-radius: 99px;
+      position: absolute;
+      animation: indeterminate 1.6s infinite ease-in-out;
+    }
+
+    @keyframes indeterminate {
+      0% { left: -40%; width: 30%; }
+      50% { left: 30%; width: 50%; }
+      100% { left: 100%; width: 30%; }
+    }
+
+    /* Offline Alert Modal */
+    #offline-alert {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 26, 48, 0.92);
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      color: white;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .offline-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 30px;
+      border-radius: 20px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    }
+
+    .offline-icon {
+      font-size: 48px;
+      color: #f59e0b;
+      margin-bottom: 16px;
+    }
+
+    .btn-retry {
+      margin-top: 20px;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+      transition: all 0.2s;
+    }
+
+    .btn-retry:active {
+      transform: scale(0.97);
+    }
+
+    /* Floating Quick Bar (ปุ่มรีเฟรชด่วน) */
+    .floating-refresh-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(13, 110, 253, 0.85);
+      backdrop-filter: blur(4px);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 900;
+      opacity: 0.65;
+      transition: opacity 0.3s, transform 0.2s;
+    }
+
+    .floating-refresh-btn:hover,
+    .floating-refresh-btn:active {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    /* URL Config Alert Screen (กรณีผู้ใช้ยังไม่ได้ใส่ URL ในโค้ด) */
+    #setup-alert {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b1a30;
+      z-index: 10001;
+      color: white;
+      padding: 24px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app-container">
+    <!-- หน้าจอ Splash Loading -->
+    <div id="splash-screen">
+      <div class="app-logo-badge">
+        <i class="fa-solid fa-scale-balanced"></i>
+      </div>
+      <h1 class="app-title">ระบบบริหารจัดการสัญญาประกันศาล</h1>
+      <p class="app-subtitle">กำลังโหลดข้อมูลระบบ...</p>
+      <div class="loader-bar">
+        <div class="loader-bar-inner"></div>
+      </div>
+    </div>
+
+    <!-- หน้าจอแจ้งเตือนเน็ตหลุด -->
+    <div id="offline-alert">
+      <div class="offline-card">
+        <i class="fa-solid fa-wifi-slash offline-icon"></i>
+        <h3 style="font-weight: 700; margin-bottom: 8px;">ขาดการเชื่อมต่ออินเทอร์เน็ต</h3>
+        <p style="font-size: 0.95rem; color: #cbd5e1;">กรุณาตรวจสอบสัญญาณเน็ตของคุณ แล้วลองใหม่อีกครั้ง</p>
+        <button class="btn-retry" onclick="reloadApp()">
+          <i class="fa-solid fa-rotate-right me-1"></i> ลองใหม่อีกครั้ง
+        </button>
+      </div>
+    </div>
+
+    <!-- ปุ่มลอยสำหรับรีเฟรชหน้าเว็บด่วน -->
+    <button class="floating-refresh-btn" title="รีเฟรชหน้า" onclick="reloadApp()" id="refreshBtn">
+      <i class="fa-solid fa-rotate-right"></i>
+    </button>
+
+    <!-- หน้าจอช่วยเหลือกรณีลืมใส่ URL -->
+    <div id="setup-alert">
+      <div style="max-width: 500px; margin: 40px auto; background: rgba(255,255,255,0.08); padding: 25px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.15);">
+        <h2 style="color: #60a5fa; margin-bottom: 12px;"><i class="fa-solid fa-gear"></i> ตั้งค่า URL เริ่มต้น</h2>
+        <p style="color: #e2e8f0; line-height: 1.6;">กรุณานำ Web App URL ของ Google Apps Script ที่ Deploy ไว้ (ลงท้ายด้วย <code>/exec</code>) มาใส่ในไฟล์ <code>index.html</code> ตัวแปร <code>APPS_SCRIPT_URL</code> ครับ</p>
+      </div>
+    </div>
+
+    <!-- Iframe แสดงผล Google Apps Script เต็มจอ -->
+    <iframe 
+      id="gas-frame"
+      src=""
+      allow="camera; microphone; geolocation; clipboard-read; clipboard-write; fullscreen"
+      sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+    ></iframe>
+  </div>
+
+  <script>
+    // =========================================================================
+    // ⚙️ นำ URL ของ Google Apps Script Web App (ที่ลงท้ายด้วย /exec) มาใส่ตรงนี้
+    // =========================================================================
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYOUR_SCRIPT_ID_HERE/exec";
+
+    const gasFrame = document.getElementById('gas-frame');
+    const splashScreen = document.getElementById('splash-screen');
+    const offlineAlert = document.getElementById('offline-alert');
+    const setupAlert = document.getElementById('setup-alert');
+
+    function initApp() {
+      // ตรวจสอบว่ามีการใส่ URL ที่ถูกต้องหรือยัง
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_SCRIPT_ID_HERE")) {
+        splashScreen.classList.add('hidden');
+        setupAlert.style.display = 'block';
+        return;
+      }
+
+      // ดึง Query String จาก URL ของ GitHub Pages ไปส่งต่อให้ Apps Script (ถ้ามี)
+      const currentSearch = window.location.search;
+      const targetUrl = APPS_SCRIPT_URL + (currentSearch ? (APPS_SCRIPT_URL.includes('?') ? '&' + currentSearch.substring(1) : currentSearch) : '');
+
+      gasFrame.src = targetUrl;
+
+      // เมื่อ Iframe โหลดเสร็จ ซ่อน Splash Screen
+      gasFrame.addEventListener('load', () => {
+        setTimeout(() => {
+          splashScreen.classList.add('hidden');
+        }, 300);
+      });
+
+      // ป้องกันกรณี Iframe โหลดนานเกิน 6 วินาที ให้ปิด Splash Screen เพื่อให้ผู้ใช้เห็นสถานะ
+      setTimeout(() => {
+        splashScreen.classList.add('hidden');
+      }, 6000);
+    }
+
+    function reloadApp() {
+      if (!navigator.onLine) {
+        offlineAlert.style.display = 'flex';
+        return;
+      }
+      offlineAlert.style.display = 'none';
+      splashScreen.classList.remove('hidden');
+      const btn = document.getElementById('refreshBtn');
+      if (btn) btn.querySelector('i').classList.add('fa-spin');
+
+      gasFrame.src = gasFrame.src;
+
+      setTimeout(() => {
+        if (btn) btn.querySelector('i').classList.remove('fa-spin');
+      }, 1500);
+    }
+
+    // ตรวจสอบสถานะ Online / Offline
+    window.addEventListener('online', () => {
+      offlineAlert.style.display = 'none';
+    });
+
+    window.addEventListener('offline', () => {
+      offlineAlert.style.display = 'flex';
+    });
+
+    // เริ่มต้นแอป
+    if (!navigator.onLine) {
+      offlineAlert.style.display = 'flex';
+    } else {
+      initApp();
+    }
+
+    // =========================================================================
+    // 📲 ลงทะเบียน Service Worker สำหรับรองรับ PWA และ PWABuilder 100%
+    // =========================================================================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => {
+            console.log('✅ ServiceWorker Registered:', reg.scope);
+          })
+          .catch(err => {
+            console.log('❌ ServiceWorker Registration Failed:', err);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
